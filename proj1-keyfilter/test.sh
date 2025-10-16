@@ -18,7 +18,7 @@ if ! [ -f keyfilter.c ]; then
 fi
 
 # compile SUT
-gcc -std=c11 -Wall -Wextra -o keyfilter keyfilter.c || die "Compilation failed."
+gcc -std=c11 -Wall -Wextra -Werror keyfilter.c -o keyfilter || die "Compilation failed."
 
 # $1 file to be redirected to stdin
 # $2 file with expected content of stdout
@@ -144,8 +144,8 @@ YORK
 #end default cases
 
 test_case 9 "space_one" \
-"HELLO WORLD" \
-"Found: HELLO WORLD\n" \
+"HELLO WORLD\n" \
+"Found: HELLO WORLD" \
 HELLO
 
 test_case 10 "space_multiple_output" \
@@ -172,3 +172,14 @@ test_case 14 "european largest" \
 "Istanbul\nMoscow\nLondon\nSaint Petersburg\nBerlin\nMadrid\nKyiv\nRome\nBaku\nParis\nVienna\nMinsk\nWarsaw\nHamburg\nBucharest\nBarcelona\nBudapest\nBelgrade\nMunich\nKharkiv\nPrague\nMilan\nKazan\nSofia\nTbilisi\nNizhny Novgorod\nUfa\nBirmingham\nKrasnodar\nSamara\nRostov-on-Don\nYerevan\nVoronezh\nPerm\nCologne\nVolgograd\nOdesa\n" \
 "Enable: LR" \
 BE
+
+test_case 15 "non-ascii_enable (nonzero)" \
+"ILG\nIštanbuľ\nIndia\nBrňo\nKošiče" \
+"Enable: LN" \
+I
+
+
+test_case 16 "huge stdin" \
+"El Tarter\nSant Juli de Lria\nPas de la Casa\nOrdino\nles Escaldes\nla Massana\nEncamp\nCanillo\nArinsal\nAnys\nAndorra la Vella\nAixirivall\nWarsn\nUmm Suqaym\nUmm Al Quwain City\narf Kalb\nAr Rshidyah\nRas Al Khaimah City\nMuzayri\nMurba\nMaf\nZayed City\nKhawr Fakkn\nKalb\nJumayr\nAl Jazrah al amr\nDubai\nDibba Al-Fujairah\nDibba Al-Hisn\nDayrah\nSharjah\nAsh Sham\nAr Ruways\nAl Manmah\nAl amryah\natt\nAl Fujairah City\nAl Ain City\nAjman City\nAdh Dhayd\nAbu Dhabi\nAb Hayl\nAs Sawah\nNadd al umr\nAl Lusayl\nSuwayn\nAl amdyah\nAl Waheda\nAl Twar First\nAL Twar Second\nAl Qusais Second\nAl Karama\nAl Hudaiba\nKnowledge Village\nThe Palm Jumeirah\nZaabeel\nOud Metha\nBur Dubai\nKhalifah A City\nShakhbout City\nMirdif\nHawr al Anz\nMankhl\nBr Sad\nNyf\nAl Murar al Qadm\nAr Riqqah\nAl Warqaa\nInternational City\nDubai Marina\nDubai Sports City\nDubai Internet City\nAl Sufouh\nAl Safa\nAr Rumaylah\nMushayrif\nAl Jurf\nAl Majaz\nAs Sawah Sharq\nDubai Festival City\nDubai International Financial Centre\nDowntown Dubai\nDubai Investments Park\nJebel Ali\nBani Yas City\nMusaffah\nAl Shamkhah City\nReef Al Fujairah City\nAl Wiqan\nAl Faqaa\nShabiyyat Al Hiyar\nShabiyyat Milhah\nUmm Al Sheif\nAl Badaa\nAl Muteena\nAl Mizhar First\nAl Mizhar Second\nDubai Silicon Oasis\nDubai Motor City\nDAMAC Hills\nAl Furjan\nBusiness Bay\nAl Qusais 1\nAl Twar 3\nAl Khabaisi\nAl Khawaneej 1\nHalwan\nAl Sajaah\nLahbab\nAl Madam\nAl Raafah\nMohammed Bin Zayed City\nMasdar City\nZr K\nWulswl Bihsd\nKuhsn\nLsh\nTukzr\nBati\nMray\nq Kupruk\nZurmat\nZaybk\nZrat-e Shh Maqd\nZindah Jn\nZarghn Shahr\nZaah Sharan\nZaranj\nZamt Klay\nYang Qalah\nBzr-e Yakwlang\nYay Khl\nWshr\nTrmay\nTlak\nTtn\nTr Pul\nTaywarah\nBzr-e Tashkn\nTarinkot\nTaloqan\nTagw-By\nTagb\nMarkaz-e ukmat-e Suln-e Bakwh\nSpn Bldak\nSprah\nSzmah Qalah\nSiyhgird\nShwah\nShnan\nShaykh Amr Klay\nQshql\nShibirghn\nShwk\nShahr-e af\nShahrn\nShahrak\nAlqahdr Shh Jy\nWulswl Sayyid Karam\nMarkaz-e Sayyidbd\nayd\nSidqbd\nSyagaz\nSar-e Tayghn\nSarb\nSar K\nSarfirz Kal\nSar-e Pul\nSar Chakn\nSangn\nSang-e Mshah\nSang-e Chrak\nSang Atesh\nSangar Sary\nAbak\nR-ye Sang\nRdbr\nRustq\nRab-e Sang-ye Pn\nRmak\nQurghn\nQuchangh\nQar\nQarqn\nQarghah\nQarch Gak\nQarwul\nQarah Bgh\nQarah Bgh\nQala i Naw\nQalah-ye Kf\nQalah-ye Kuhnah\nQalah-ye Shahr\nQalt\nQalah-ye Shh\nQdis\nPrn\nPul-e Khumr\nPul-e Alam\nPasnay" \
+"Enable: ABCDEHIJKLMNOPQRSTUWYZ" \
+""
