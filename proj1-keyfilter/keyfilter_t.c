@@ -17,17 +17,22 @@ int exhaust_current_adress(void){
 }
 
 // MAIN FUNC
+// argv[1] - adress search prefix (string)
+// argv[2] - debug mode (int (bool))
 int main(int argc, char *argv[]) {
 
-    if (argc == 1) { // pripad ked chyba hlavny input argument, zamenime za ""
+    // if main input argument argv[1] (adress prefix) is missing, make it an empty string
+    if (argc == 1) { 
         argv[1] = "";
     }
 
     int input_len = strlen(argv[1]);
 
-    char matched_adress[101] = ""; // 100len + 1 \0
+    // matched_adress -> saved adress that is a 100% match
+    char matched_adress[102] = ""; // 100len + 1 \0
+    char cmpd_adress[102] = "";
     int matching_adresses = 0;
-    char current_adress[101] = "";
+    char current_adress[102] = "";
     int current_adress_len = 0;
 
     //Prazdna array ktoru naplnime jednotkami, az na poslednu hodnotu (lebo 0 terminuje string)
@@ -47,7 +52,8 @@ int main(int argc, char *argv[]) {
     //printf("- Input string: %s\n", argv[1]);
     
     // MAIN LOOP
-    while ((next_key = getchar()) != EOF){
+    int safecount = 0;
+    while (((next_key = getchar()) != EOF) && (current_adress_len < 100)){
 
         if (next_key == '\n'){ // koniec adresy, prechod na novú adresu
 
@@ -62,19 +68,29 @@ int main(int argc, char *argv[]) {
         }
 
         // save current adress throughout input stream
+        //printf("CURLEN:%i ", current_adress_len);
         current_adress[current_adress_len++] = next_key;
         current_adress[current_adress_len] = '\0';
 
         //printf("%c", next_key);
 
         if (check_index >= input_len){ //input ran out of chars, save the next key in adress to possible keys, begin next adress
-            possible_keys[next_key-32] = next_key; 
-            has_possible_key = 1;
+            //printf("%i", next_key);
+            possible_keys[next_key-32] = next_key;
+
+            /*
+            for(int i = 0; i < 105; i++){
+                printf("%i ", possible_keys[i]);
+            }
+            */
+            //printf("\n");
+            has_possible_key++;
             check_index = 0;
 
             //printf("-Exhausting current adress into current_adress");
             int nxt;
-            while ((nxt = getchar()) != EOF){
+            int safecount_2 = 0;
+            while (((nxt = getchar()) != EOF) && (current_adress_len < 100)){
                 if (nxt == '\n'){
                     break;
                 }
@@ -82,13 +98,8 @@ int main(int argc, char *argv[]) {
                 current_adress[current_adress_len] = '\0';
             }
             //printf("-Finished\n");
-
-            matching_adresses++;
-            if (strlen(current_adress) < strlen(matched_adress) || strlen(matched_adress) == 0){
-                strcpy(matched_adress, current_adress); // prepis terajsiu adresu do momentalnej matched adresy
-                continue;
-            }
-
+            
+            strcpy(cmpd_adress, current_adress); // prepis terajsiu adresu do momentalnej matched adresy
 
             continue;
         }
@@ -112,17 +123,27 @@ int main(int argc, char *argv[]) {
     // OUTPUT
     //matched string
     //printf("matched: %i\n", matching_adresses);
-    if ((matching_adresses < 2) && (strlen(matched_adress) > 0)){
+    if ((matching_adresses >= 1) && (strlen(matched_adress) > 0)){
         printf("Found: ");
         int i = 0;
         while (matched_adress[i] != '\0'){
             printf("%c", toupper(matched_adress[i++]));
         }
         printf("\n");
-        //printf("Found: %s\n", strupr(matched_adress));
     }
     //enable chars (!SORT)
-    if (has_possible_key && matching_adresses != 1){
+    if (has_possible_key){
+        
+        if (has_possible_key == 1 && matching_adresses == 0){
+            printf("Found: ");
+            int i = 0;
+            while (cmpd_adress[i] != '\0'){
+                printf("%c", toupper(cmpd_adress[i++]));
+            }
+            printf("\n");
+            return 0;
+        }
+        
         printf("Enable: ");
         for(int i = 0; i<94; i++){
             if (possible_keys[i] != 1){
@@ -130,6 +151,7 @@ int main(int argc, char *argv[]) {
             }
         }
         printf("\n");
+        return 0;
     } else if (matching_adresses != 1) { // no chars saved, adress with prefix not found
         printf("Not found\n");
     }
