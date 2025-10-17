@@ -73,8 +73,7 @@ int main(int argc, char *argv[]) {
         // If we've reached the end of current adress,
         if (next_key == '\n' || next_key == EOF){
 
-            /*//If our search prefix input, ignore adress
-            if (input_len < check_index){
+            /*if (input_len < check_index){
                 exhaust_current_adress();
             }*/
 
