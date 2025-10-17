@@ -1,12 +1,13 @@
+/* AUTHOR: S. Bončo */
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdbool.h>
 
-
 // Length in characters for which this program supports reading and saving adresses.
 // In case adress longer than supported length, it is ignored/skipped in the list of adresses.
-// A possible key may be saved from an adress that is too long
+// A "Enable" key can be saved from an adress that longer than the limit.
 // Must not be negative.
 const int MAX_SUPPORTED_ADRESS_LEN = 100;
 
