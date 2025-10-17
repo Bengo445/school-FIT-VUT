@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdbool.h>
 
 
 // Exhaust current adress (read stdin) until new line character or EOF
@@ -16,25 +17,21 @@ int exhaust_current_adress(void) {
 
 // MAIN FUNCTION
 int main(int argc, char *argv[]) {
-
     // Missing prefix input (argument 2), treat as empty string
-    if (argc == 1) {
-        argv[1] = "";
-    }
+    if (argc == 1) {argv[1] = "";}
     //printf("- Input string: %s\n", argv[1]); //DEBUG
-
     int input_len = strlen(argv[1]);
 
     // Support for adresseses up to 100 chars long
     char matching_adress[101] = ""; // Space to save a fully matching adress
-    int matching_adress_found = 0; // For simpler output checks
+    bool matching_adress_found = false; // For simpler output checks
     char partial_adress[101] = ""; // Space to save a partially matching adress in case of being the only possible matching adress
     char current_adress[101] = ""; // Space for adress that is currently being read
     int current_adress_len = 0;
 
     int next_key = 0; // Currently reading key in adress 
     int check_index = 0; // Index for comparing the next key and input search prefix while reading an adress
-    int carriage_return = 0; // When set to 1, next main loop will behave as if reading a new adress
+    bool carriage_return = false; // When set to 1, next main loop will behave as if reading a new adress
 
     //The possible_keys array serves as a way to save keys which are concidered "Enabled" for the output.
     //Due to the way we use it, it is naturally sorted and doesn't have duplicates.
@@ -55,7 +52,7 @@ int main(int argc, char *argv[]) {
         // Every time a new main loop would start reading a new adress, carriage_return should be 1
         // Clear current_adress buffer and reset check_index
         if (carriage_return){
-            carriage_return = 0;
+            carriage_return = false;
             current_adress[0] = '\0';
             current_adress_len = 0;
             check_index = 0;
@@ -66,7 +63,7 @@ int main(int argc, char *argv[]) {
             exhaust_current_adress();
 
             // Moving onto next adress in next loop
-            carriage_return = 1;
+            carriage_return = true;
             continue;
         }
 
@@ -80,13 +77,13 @@ int main(int argc, char *argv[]) {
             //If our search prefix input matches it exactly, save it as a matching adress
             if(input_len == current_adress_len) {
 
-                matching_adress_found = 1;
+                matching_adress_found = true;
 
                 // Copy current_adress buffer into matching_adress
                 strcpy(matching_adress, current_adress);
 
                 // Moving onto next adress in next loop
-                carriage_return = 1;
+                carriage_return = true;
                 continue;
             }
         }
@@ -117,7 +114,7 @@ int main(int argc, char *argv[]) {
             strcpy(partial_adress, current_adress);
 
             // Moving onto next adress in next loop
-            carriage_return = 1;
+            carriage_return = true;
             continue;
         }
 
@@ -129,7 +126,7 @@ int main(int argc, char *argv[]) {
         // next_key doesn't match input prefix anymore, ignore adress
         } else { 
             // Moving onto next adress in next loop
-            carriage_return = 1;
+            carriage_return = true;
         }
     }
     // FINISHED READING FILE "adresy.txt"
@@ -137,7 +134,7 @@ int main(int argc, char *argv[]) {
     
     // OUTPUT - Output matching adress first, then enabled characters. Else "Not found".
     // If at least one fully matching, non-empty adress was found, print to output
-    if ((matching_adress_found >= 1) && (strlen(matching_adress) > 0)) {
+    if ((matching_adress_found) && (strlen(matching_adress) > 0)) {
         printf("Found: ");
         int i = 0;
         while (matching_adress[i] != '\0') {
@@ -149,7 +146,7 @@ int main(int argc, char *argv[]) {
     if (possible_keys_count > 0) {
 
         // Exactly 1 possible key found, concider the last adress partially matched with it as Found
-        if (possible_keys_count == 1 && matching_adress_found == 0) {
+        if (possible_keys_count == 1 && !matching_adress_found) {
             printf("Found: ");
             // Print out partial_adress char by char, converting the whole string to uppercase as per assignment
             int i = 0;
@@ -170,7 +167,7 @@ int main(int argc, char *argv[]) {
         }
 
     // No possible keys or single partially matching adress found
-    } else if (matching_adress_found == 0) { 
+    } else if (!matching_adress_found) { 
         printf("Not found\n");
     }
 

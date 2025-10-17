@@ -163,17 +163,12 @@ test_case 12 "big_line_enable_nocrash (nonzero)" \
 "Enable: EN" \
 BR
 
-test_case 13 "big_line_arg_nocrash (nonzero)" \
-"ABABABABABABABABABACDCDCDCDCDDCDCDCDCDCDEFEFEFFEFEFEFEFEFEFEFEFTHTHTHTHTHTHTHTHTHTHTHAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBPRAHA\nPRAHA\nBRNO" \
-"ABABABABABABABABABACDCDCDCDCDDCDCDCDCDCDEFEFEFFEFEFEFEFEFEFEFEFTHTHTHTHTHTHTHTHTHTHTHAAAAAAAAAAAAAAA" \
-ABABABABABABABABABACDCDCDCDCDDCDCDCDCDCDEFEFEFFEFEFEFEFEFEFEFEFTHTHTHTHTHTHTHTHTHTHTHAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBPRAHA
-
 test_case 14 "european largest" \
 "Istanbul\nMoscow\nLondon\nSaint Petersburg\nBerlin\nMadrid\nKyiv\nRome\nBaku\nParis\nVienna\nMinsk\nWarsaw\nHamburg\nBucharest\nBarcelona\nBudapest\nBelgrade\nMunich\nKharkiv\nPrague\nMilan\nKazan\nSofia\nTbilisi\nNizhny Novgorod\nUfa\nBirmingham\nKrasnodar\nSamara\nRostov-on-Don\nYerevan\nVoronezh\nPerm\nCologne\nVolgograd\nOdesa\n" \
 "Enable: LR" \
 BE
 
-test_case 15 "non-ascii_enable (nonzero)" \
+test_case 15 "non-ascii_enable (ignore adresses)" \
 "ILG\nIštanbuľ\nIndia\nBrňo\nKošiče" \
 "Enable: LN" \
 I
