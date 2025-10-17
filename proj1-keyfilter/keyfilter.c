@@ -4,33 +4,42 @@
 #include <stdbool.h>
 
 
-// Exhaust current adress (read stdin) until new line character or EOF
-int exhaust_current_adress(void) { 
+// Length in characters for which this program supports reading and saving adresses.
+// In case adress longer than supported length, it is ignored/skipped in the list of adresses.
+// A possible key may be saved from an adress that is too long
+// Must not be negative.
+const int MAX_SUPPORTED_ADRESS_LEN = 100;
+
+// Exhaust current adress (read stdin) until new line character or EOF.
+void exhaust_current_adress(void) { 
     int nxt;
     while ((nxt = getchar()) != EOF){
-        if (nxt == '\n'){
-            break;
-        }
+        if (nxt == '\n') {break;}
     }
-    return 0;
 }
 
 // MAIN FUNCTION
+// argv[1] = adress search prefix input
 int main(int argc, char *argv[]) {
     // Missing prefix input (argument 2), treat as empty string
     if (argc == 1) {argv[1] = "";}
     //printf("- Input string: %s\n", argv[1]); //DEBUG
     int input_len = strlen(argv[1]);
 
-    // Support for adresseses up to 100 chars long
-    char matching_adress[101] = ""; // Space to save a fully matching adress
-    bool matching_adress_found = false; // For simpler output checks
-    char partial_adress[101] = ""; // Space to save a partially matching adress in case of being the only possible matching adress
-    char current_adress[101] = ""; // Space for adress that is currently being read
+    // Support for adresseses up to MAX_SUPPORTED_ADRESS_LEN chars long
+    if (MAX_SUPPORTED_ADRESS_LEN < 0){
+        printf("Invalid MAX_SUPPORTED_ADRESS_LEN, must not be negative.");
+        return 1;
+    }
+
+    char matching_adress[MAX_SUPPORTED_ADRESS_LEN+1]; matching_adress[0] = '\0'; // Space to save a fully matching adress
+    bool matching_adress_found = false; // To simplify output checks
+    char partial_adress[MAX_SUPPORTED_ADRESS_LEN+1]; partial_adress[0] = '\0'; // Space to save a partially matching adress in case of being the only logically possible matching adress
+    char current_adress[MAX_SUPPORTED_ADRESS_LEN+1]; current_adress[0] = '\0'; // "Buffer" space for adress that is currently being read
     int current_adress_len = 0;
 
     int next_key = 0; // Currently reading key in adress 
-    int check_index = 0; // Index for comparing the next key and input search prefix while reading an adress
+    int check_index = 0; // Index for comparing the next key and input prefix while reading an adress
     bool carriage_return = false; // When set to 1, next main loop will behave as if reading a new adress
 
     //The possible_keys array serves as a way to save keys which are concidered "Enabled" for the output.
@@ -59,7 +68,7 @@ int main(int argc, char *argv[]) {
         }
 
         // If harcoded adress-length limit is reached or non-ascii character found, ignore adress
-        if (current_adress_len >= 100 || next_key > 127){
+        if (current_adress_len >= MAX_SUPPORTED_ADRESS_LEN || next_key > 127){
             exhaust_current_adress();
 
             // Moving onto next adress in next loop
@@ -75,7 +84,7 @@ int main(int argc, char *argv[]) {
             }*/
 
             //If our search prefix input matches it exactly, save it as a matching adress
-            if(input_len == current_adress_len) {
+            if(input_len == current_adress_len && current_adress_len > 0) {
 
                 matching_adress_found = true;
 
@@ -104,7 +113,7 @@ int main(int argc, char *argv[]) {
 
             // Read and write the rest of the current adress into the current_adress buffer
             int nxt;
-            while (((nxt = getchar()) != EOF) && (current_adress_len < 100)) {
+            while (((nxt = getchar()) != EOF) && (current_adress_len < MAX_SUPPORTED_ADRESS_LEN)) {
                 if (nxt == '\n') {break;}
                 current_adress[current_adress_len++] = nxt;
                 current_adress[current_adress_len] = '\0';
@@ -133,25 +142,24 @@ int main(int argc, char *argv[]) {
     // MAIN LOOP END
     
     // OUTPUT - Output matching adress first, then enabled characters. Else "Not found".
-    // If at least one fully matching, non-empty adress was found, print to output
+    // If (at least) 1 fully matching, non-empty adress was found, print matching to output as "Found"
     if ((matching_adress_found) && (strlen(matching_adress) > 0)) {
         printf("Found: ");
         int i = 0;
         while (matching_adress[i] != '\0') {
-            printf("%c", toupper(matching_adress[i++]));
+            printf("%c", toupper(matching_adress[i++])); //(convert to uppercase)
         }
         printf("\n");
     }
     // Cases where at least 1 possible key was found
     if (possible_keys_count > 0) {
 
-        // Exactly 1 possible key found, concider the last adress partially matched with it as Found
+        // Exactly 1 possible key found, concider the last adress that was partially-matched as "Found"
         if (possible_keys_count == 1 && !matching_adress_found) {
             printf("Found: ");
-            // Print out partial_adress char by char, converting the whole string to uppercase as per assignment
             int i = 0;
             while (partial_adress[i] != '\0') {
-                printf("%c", toupper(partial_adress[i++]));
+                printf("%c", toupper(partial_adress[i++])); //(convert to uppercase)
             }
             printf("\n");
 
