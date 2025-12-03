@@ -3,7 +3,7 @@ all: main
 .PHONY: run clean
 
 main: flows.c
-	cc -std=c11 -Wall -Wextra -Werror -pedantic flows.c -o flows -lm
+	cc -std=c11 -Wall -Wextra -Werror -pedantic flows.c -o flows -lm -g
 
 run: main
 	./main $(ARGS)
