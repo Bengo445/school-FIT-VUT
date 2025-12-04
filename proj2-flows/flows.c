@@ -43,25 +43,6 @@ double flow_distance(flow* F1, flow* F2, double* WEIGHTS) {
     return sqrt(B*B*WEIGHTS[0] + T*T*WEIGHTS[1] + D*D*WEIGHTS[2] + S*S*WEIGHTS[3]);
 }
 
-//find cluster distance (minimum distance of flows between clusters)
-double cluster_distance(cluster* clusterA, cluster* clusterB, double* WEIGHTS) {
-    double min_clusters_dist = -1;
-
-    for (int i = 0; i < clusterA->size; i++) {
-        flow* flow1 = clusterA->flows[i];
-
-        for (int j = 0; j < clusterB->size; j++) {
-            flow* flow2 = clusterB->flows[j];
-
-            double dist = flow_distance(flow1, flow2, WEIGHTS);
-
-            if (min_clusters_dist > dist || min_clusters_dist == -1)
-                min_clusters_dist = dist;
-        }
-    }
-    return min_clusters_dist;
-}
-
 //validate ip
 int validate_ipv4(int* ip) {
     for (int i = 0; i < 4; i++) {
@@ -90,48 +71,66 @@ void free_all(cluster* clusters_array, int clusters_size) {
     free(clusters_array);                         //free clusters array
 }
 
-//compare functions for usage of qsort()
-int comp_flows(const void *a, const void *b) {
-    flow *F1 = (flow *) a;
-    flow *F2 = (flow *) b;
-    return (F1->flow_id - F2->flow_id);
+//find cluster distance (minimum distance of flows between clusters)
+double cluster_distance(cluster* clusterA, cluster* clusterB, double* WEIGHTS) {
+    double min_clusters_dist = -1;
+
+    for (int i = 0; i < clusterA->size; i++) {
+        flow* flow1 = clusterA->flows[i];
+
+        for (int j = 0; j < clusterB->size; j++) {
+            flow* flow2 = clusterB->flows[j];
+
+            double dist = flow_distance(flow1, flow2, WEIGHTS);
+
+            if (min_clusters_dist > dist || min_clusters_dist == -1)
+                min_clusters_dist = dist;
+        }
+    }
+    return min_clusters_dist;
 }
-int comp_clusters(const void *a, const void *b) {
-    cluster *C1 = (cluster *) a;
-    cluster *C2 = (cluster *) b;
-    return (C1->flows[0]->flow_id - C2->flows[0]->flow_id);
-}
 
-int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SIZE, double* WEIGHTS) {
-    
-    while (*clusters_size > GOAL_CLUSTERS_SIZE && GOAL_CLUSTERS_SIZE > 0) {
-        // Find two closest clusters
-        int nearest_cluster1 = -1; int nearest_cluster2 = -1; //indexes in clusters array
-        double nearest_dist = 0;
-        for (int i = 0; i < *clusters_size; i++) {
-            cluster* cluster1 = &clusters[i];
-            
-            for (int j = i+1; j < *clusters_size; j++) {
-                cluster* cluster2 = &clusters[j];
+//find 2 closest clusters in clusters array by "distance"
+//writes resulting cluster indexes in (int found_clusters[2]) array, returns error code
+void find_closest_clusters(cluster* clusters, int CLUSTER_SIZE, double* weights, int found_clusters[2]) {
+    double nearest_dist = 0;
 
-                // Find the minimal distance of the closest flows between cluster1 and cluster2
-                double min_clusters_dist = cluster_distance(cluster1, cluster2, WEIGHTS);
-                if (min_clusters_dist == -1) {
-                    fprintf(stderr, "Unable to calculate cluster distance\n");
-                    return 1;
-                }
+    for (int i = 0; i < CLUSTER_SIZE; i++) {
+        cluster* cluster1 = &clusters[i];
+        
+        for (int j = i+1; j < CLUSTER_SIZE; j++) {
+            cluster* cluster2 = &clusters[j];
 
-                if (nearest_dist > min_clusters_dist || nearest_cluster1 == -1) {
-                    nearest_dist = min_clusters_dist;
-                    nearest_cluster1 = i;
-                    nearest_cluster2 = j;
-                }
+            // Find the minimal distance of the closest flows between cluster1 and cluster2
+            double min_clusters_dist = cluster_distance(cluster1, cluster2, weights);
+            if (min_clusters_dist == -1)
+                continue;
+
+            if (nearest_dist > min_clusters_dist || found_clusters[0] == -1) {
+                nearest_dist = min_clusters_dist;
+                found_clusters[0] = i;
+                found_clusters[1] = j;
             }
         }
-        
+    }
+}
+
+//main cluster process - reduce size of clusters array to GOAL_CLUSTERS_SIZE by combining clusters
+int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SIZE, double* weights) {
+
+    while (*clusters_size > GOAL_CLUSTERS_SIZE && GOAL_CLUSTERS_SIZE > 0) {
+
+        // Find two closest clusters
+        int found_clusters[2] = {-1, -1};                       //indexes in clusters array
+        find_closest_clusters(clusters, *clusters_size, weights, found_clusters);
+        if (found_clusters[0] == -1 || found_clusters[1] == -1) {
+            fprintf(stderr, "Failed to find nearest clusters\n");
+            return 1;
+        }
+
         // Combine clusters (into cluster1)
-        cluster* cluster1 = &clusters[nearest_cluster1];
-        cluster* cluster2 = &clusters[nearest_cluster2];
+        cluster* cluster1 = &clusters[found_clusters[0]];
+        cluster* cluster2 = &clusters[found_clusters[1]];
         void* realloc_temp = NULL;
 
         realloc_temp = realloc(cluster1->flows, (cluster1->size + cluster2->size) * sizeof(flow*));
@@ -149,7 +148,7 @@ int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SI
         // Free cluster2 (without freeing any actual flow objects)
         free(cluster2->flows);
 
-        for (int i = nearest_cluster2+1; i < *clusters_size; i++) {
+        for (int i = found_clusters[1] + 1; i < *clusters_size; i++) {
             clusters[i-1] = clusters[i];
         }
         *clusters_size -= 1;
@@ -158,6 +157,77 @@ int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SI
     }
 
     return 0;
+}
+
+//main cluster input - write flow data into individual clusters, a cluster starts with a single flow
+int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DATA) {
+
+    for (int i = 0; i < flow_count; i++){
+        // Initialize cluster of size 1 for current flow
+        clusters[i].size = 1;
+        clusters[i].flows = malloc(sizeof(flow*));
+        if (clusters[i].flows == NULL) {
+            fprintf(stderr, "Failed to malloc flow* array of size 1 in cluster %i\n", i);
+            return 1;
+        }
+        *clusters_size += 1;
+
+        flow* new_flow = malloc(sizeof(flow));      // current flow reference for easier work
+        if (new_flow == NULL) {
+            fprintf(stderr, "Failed to malloc flow object i:%i\n", i);
+            return 1;
+        }
+        clusters[i].flows[0] = new_flow; 
+        
+        // Read flow data
+        //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
+        // (read ips only to check validity)
+        unsigned int packet_count;
+        int ip1[4];
+        int ip2[4];
+
+        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %u %u %u %lf",
+            &new_flow->flow_id,
+            &ip1[0],&ip1[1],&ip1[2],&ip1[3],
+            &ip2[0],&ip2[1],&ip2[2],&ip2[3],
+            &new_flow->total_bytes,
+            &new_flow->flow_duration,
+            &packet_count,
+            &new_flow->avg_interarrival_time
+        );
+        if (data_count != 13) {
+            fprintf(stderr, "Missing data values (data_count:%i)\n", data_count);
+            return 1;
+        }
+
+        // Check ips
+        if (!validate_ipv4(ip1) || !validate_ipv4(ip2)) {
+            fprintf(stderr, "Invalid IP in flow id:%i\n", new_flow->flow_id);
+            return 1;
+        };
+
+        // Calculate average packet length for flow
+        if (packet_count == 0) {
+            fprintf(stderr, "Invalid data in flow id:%i (packet_count = 0)\n", new_flow->flow_id);
+            return 1;
+        }
+        new_flow->avg_packet_len = (double) new_flow->total_bytes / packet_count;
+
+    }
+
+    return 0;
+}
+
+//compare functions for usage of qsort()
+int comp_flows(const void *a, const void *b) {
+    flow *F1 = (flow *) a;
+    flow *F2 = (flow *) b;
+    return (F1->flow_id - F2->flow_id);
+}
+int comp_clusters(const void *a, const void *b) {
+    cluster *C1 = (cluster *) a;
+    cluster *C2 = (cluster *) b;
+    return (C1->flows[0]->flow_id - C2->flows[0]->flow_id);
 }
 
 
@@ -208,69 +278,11 @@ int main(int argc, char* argv[]) { //syntax: ./flows SOUBOR [N WB WT WD WS]
         return 1;
     }
 
-    // Write flow data into flows array
-    for (int i = 0; i < flow_count; i++){
-
-        // Initialize cluster of size 1 for current flow
-        clusters[i].size = 1;
-        clusters[i].flows = malloc(sizeof(flow*));
-        if (clusters[i].flows == NULL) {
-            fprintf(stderr, "Failed to malloc flow* array of size 1 in cluster %i\n", i);
-            free_all(clusters, clusters_size);
-            fclose(DATA);
-            return 1;
-        }
-        clusters_size++;
-
-        flow* new_flow = malloc(sizeof(flow));      // current flow reference for easier work
-        if (new_flow == NULL) {
-            fprintf(stderr, "Failed to malloc flow object i:%i\n", i);
-            free_all(clusters, clusters_size);
-            fclose(DATA);
-            return 1;
-        }
-        clusters[i].flows[0] = new_flow; 
-        
-        // Read flow data
-        //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
-        // (read ips only to check validity)
-        unsigned int packet_count;
-        int ip1[4];
-        int ip2[4];
-
-        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %u %u %u %lf",
-            &new_flow->flow_id,
-            &ip1[0],&ip1[1],&ip1[2],&ip1[3],
-            &ip2[0],&ip2[1],&ip2[2],&ip2[3],
-            &new_flow->total_bytes,
-            &new_flow->flow_duration,
-            &packet_count,
-            &new_flow->avg_interarrival_time
-        );
-        if (data_count != 13) {
-            fprintf(stderr, "Missing data values (data_count:%i)\n", data_count);
-            free_all(clusters, clusters_size);
-            fclose(DATA);
-            return 1;
-        }
-
-        // Check ips
-        if (!validate_ipv4(ip1) || !validate_ipv4(ip2)) {
-            fprintf(stderr, "Invalid IP in flow id:%i\n", new_flow->flow_id);
-            free_all(clusters, clusters_size);
-            fclose(DATA);
-            return 1;
-        };
-
-        // Calculate average packet length for flow
-        if (packet_count == 0) {
-            fprintf(stderr, "Invalid data in flow id:%i (packet_count = 0)\n", new_flow->flow_id);
-            free_all(clusters, clusters_size);
-            fclose(DATA);
-            return 1;
-        }
-        new_flow->avg_packet_len = (double) new_flow->total_bytes / packet_count;
-
+    int err_input_flows = input_flows(flow_count, clusters, &clusters_size, DATA);
+    if (err_input_flows) {
+        free_all(clusters, clusters_size);
+        fclose(DATA);
+        return 1;
     }
 
     // Close file
