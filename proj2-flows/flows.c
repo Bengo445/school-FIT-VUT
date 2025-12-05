@@ -2,13 +2,13 @@
 // ZIT - PROJ 2 - Samuel Bončo
 
 
-// LIBS
+// -- LIBS --
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 
-// STRUCTS
+// -- STRUCTS --
 typedef struct S_flow {
     int flow_id;                    //
     unsigned int total_bytes;       //whole bytes
@@ -23,27 +23,8 @@ typedef struct S_cluster {
 } cluster;
 
 
-// FUNCS
-//print cluster info
-void print_cluster(int ID, cluster* CLUSTER) {
-    printf("cluster %i:", ID);
-    for (int j = 0; j < CLUSTER->size; j++) {
-        printf(" %i", CLUSTER->flows[j]->flow_id);
-    }
-    printf("\n");
-}
-
-//calculate weighted euclidean distance between 2 flows
-//fuck pow()
-double flow_distance(flow* F1, flow* F2, double* WEIGHTS) {
-    double B = (double) F1->total_bytes      - (double) F2->total_bytes;
-    double T = (double) F1->flow_duration    - (double) F2->flow_duration;
-    double D = F1->avg_interarrival_time     - F2->avg_interarrival_time;
-    double S = F1->avg_packet_len            - F2->avg_packet_len;
-    return sqrt(B*B*WEIGHTS[0] + T*T*WEIGHTS[1] + D*D*WEIGHTS[2] + S*S*WEIGHTS[3]);
-}
-
-//validate ip
+// -- FUNCS --
+// Validates ipv4 - checks each octet for invalid values.
 int validate_ipv4(int* ip) {
     for (int i = 0; i < 4; i++) {
         if (ip[i] < 0 || ip[i] > 255) {
@@ -53,8 +34,8 @@ int validate_ipv4(int* ip) {
     return 1;
 }
 
-//free CLUSTERS_SIZE clusters from CLUSTERS array
-//CLUSTERS_SIZE is needed to properly access and free CLUSTER.flows array
+// Free clusters_size clusters from CLUSTERS array.
+// clusters_size is needed to properly access and free CLUSTER.flows array.
 void free_all(cluster* clusters_array, int clusters_size) {
     if (clusters_array == NULL) 
         return;
@@ -68,10 +49,20 @@ void free_all(cluster* clusters_array, int clusters_size) {
         free(cluster->flows);               //free flows array in cluster
     }
 
-    free(clusters_array);                         //free clusters array
+    free(clusters_array);                   //free clusters array
 }
 
-//find cluster distance (minimum distance of flows between clusters)
+// Calculate weighted euclidean distance between 2 flows.
+// pow() sucks
+double flow_distance(flow* F1, flow* F2, double* WEIGHTS) {
+    double B = (double) F1->total_bytes      - (double) F2->total_bytes;
+    double T = (double) F1->flow_duration    - (double) F2->flow_duration;
+    double D = F1->avg_interarrival_time     - F2->avg_interarrival_time;
+    double S = F1->avg_packet_len            - F2->avg_packet_len;
+    return sqrt(B*B*WEIGHTS[0] + T*T*WEIGHTS[1] + D*D*WEIGHTS[2] + S*S*WEIGHTS[3]);
+}
+
+// Finds the "distance" between two clusters (minimum distance of any two flows from each cluster).
 double cluster_distance(cluster* clusterA, cluster* clusterB, double* WEIGHTS) {
     double min_clusters_dist = -1;
 
@@ -90,8 +81,8 @@ double cluster_distance(cluster* clusterA, cluster* clusterB, double* WEIGHTS) {
     return min_clusters_dist;
 }
 
-//find 2 closest clusters in clusters array by "distance"
-//writes resulting cluster indexes in (int found_clusters[2]) array, returns error code
+// Finds 2 closest clusters in clusters array.
+// Writes resulting cluster indexes into (int found_clusters[2]) array. Doesn't change array if distance is invalid.
 void find_closest_clusters(cluster* clusters, int CLUSTER_SIZE, double* weights, int found_clusters[2]) {
     double nearest_dist = 0;
 
@@ -115,38 +106,54 @@ void find_closest_clusters(cluster* clusters, int CLUSTER_SIZE, double* weights,
     }
 }
 
-//main cluster process - reduce size of clusters array to GOAL_CLUSTERS_SIZE by combining clusters
-int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SIZE, double* weights) {
+// Combines 2 clusters (into clusterA) by copying flows from clusterB to clusterA.
+int combine_clusters(cluster* clusterA, cluster* clusterB) {
+    //alloc bigger clusterA 
+    void* realloc_temp = realloc(clusterA->flows, (clusterA->size + clusterB->size) * sizeof(flow*));
+    if (realloc_temp == NULL) {
+        fprintf(stderr, "Failed to realloc flows when combining clusters\n");
+        return 1;
+    }
+    clusterA->flows = realloc_temp;
 
-    while (*clusters_size > GOAL_CLUSTERS_SIZE && GOAL_CLUSTERS_SIZE > 0) {
+    //copy flows
+    for (int i = 0; i < clusterB->size; i++) {
+        clusterA->flows[clusterA->size + i] = clusterB->flows[i];
+    }
+    clusterA->size = clusterA->size + clusterB->size;
+
+    return 0;
+}
+
+// Main cluster processing - reduce size of clusters array to goal_clusters_size by combining clusters.
+// Doesn't do anything if goal_clusters_size is 0 or less.
+int process_clusters(cluster* clusters, int* clusters_size, int goal_clusters_size, double* weights) {
+
+    if (goal_clusters_size <= 0) {
+        return 0;
+    }
+
+    while (*clusters_size > goal_clusters_size) {
 
         // Find two closest clusters
-        int found_clusters[2] = {-1, -1};                       //indexes in clusters array
+        int found_clusters[2] = {-1, -1};   //indexes in clusters array
         find_closest_clusters(clusters, *clusters_size, weights, found_clusters);
+
         if (found_clusters[0] == -1 || found_clusters[1] == -1) {
             fprintf(stderr, "Failed to find nearest clusters\n");
             return 1;
         }
 
-        // Combine clusters (into cluster1)
-        cluster* cluster1 = &clusters[found_clusters[0]];
-        cluster* cluster2 = &clusters[found_clusters[1]];
-        void* realloc_temp = NULL;
-
-        realloc_temp = realloc(cluster1->flows, (cluster1->size + cluster2->size) * sizeof(flow*));
-        if (realloc_temp == NULL) {
-            fprintf(stderr, "Failed to realloc flows when combining clusters\n");
+        // Combine clusters (into clusterA)
+        cluster* clusterA = &clusters[found_clusters[0]];
+        cluster* clusterB = &clusters[found_clusters[1]];
+        
+        int err_combine_clusters = combine_clusters(clusterA, clusterB);
+        if (err_combine_clusters)
             return 1;
-        }
-        cluster1->flows = realloc_temp;
 
-        for (int i = 0; i < cluster2->size; i++) {
-            cluster1->flows[cluster1->size + i] = cluster2->flows[i];
-        }
-        cluster1->size = cluster1->size + cluster2->size;
-
-        // Free cluster2 (without freeing any actual flow objects)
-        free(cluster2->flows);
+        // Free cluster2 (without freeing the flow objects stored in it)
+        free(clusterB->flows);
 
         for (int i = found_clusters[1] + 1; i < *clusters_size; i++) {
             clusters[i-1] = clusters[i];
@@ -159,7 +166,7 @@ int process_clusters(cluster* clusters, int* clusters_size, int GOAL_CLUSTERS_SI
     return 0;
 }
 
-//main cluster input - write flow data into individual clusters, a cluster starts with a single flow
+// Main cluster input - alloc all flows and save each flow into its' own cluster by pointer.
 int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DATA) {
 
     for (int i = 0; i < flow_count; i++){
@@ -180,13 +187,13 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
         clusters[i].flows[0] = new_flow; 
         
         // Read flow data
-        //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
         // (read ips only to check validity)
-        unsigned int packet_count;
+        int packet_count;
         int ip1[4];
         int ip2[4];
 
-        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %u %u %u %lf",
+        //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
+        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %u %u %i %lf",
             &new_flow->flow_id,
             &ip1[0],&ip1[1],&ip1[2],&ip1[3],
             &ip2[0],&ip2[1],&ip2[2],&ip2[3],
@@ -200,15 +207,15 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
             return 1;
         }
 
-        // Check ips
+        // Validate ips
         if (!validate_ipv4(ip1) || !validate_ipv4(ip2)) {
             fprintf(stderr, "Invalid IP in flow id:%i\n", new_flow->flow_id);
             return 1;
         };
 
         // Calculate average packet length for flow
-        if (packet_count == 0) {
-            fprintf(stderr, "Invalid data in flow id:%i (packet_count = 0)\n", new_flow->flow_id);
+        if (packet_count <= 0) {
+            fprintf(stderr, "Invalid data in flow id:%i (packet_count <= 0)\n", new_flow->flow_id);
             return 1;
         }
         new_flow->avg_packet_len = (double) new_flow->total_bytes / packet_count;
@@ -218,50 +225,17 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
     return 0;
 }
 
-//compare functions for usage of qsort()
-int comp_flows(const void *a, const void *b) {
-    flow *F1 = (flow *) a;
-    flow *F2 = (flow *) b;
-    return (F1->flow_id - F2->flow_id);
-}
-int comp_clusters(const void *a, const void *b) {
-    cluster *C1 = (cluster *) a;
-    cluster *C2 = (cluster *) b;
-    return (C1->flows[0]->flow_id - C2->flows[0]->flow_id);
-}
-
-
-// MAIN
-int main(int argc, char* argv[]) { //syntax: ./flows SOUBOR [N WB WT WD WS]
-    
-    // Read args
-    int GOAL_CLUSTERS_SIZE = 0;         // N
-    double WEIGHTS[4] = {1, 1, 1, 1};   // {WB, WT, WD, WS}
-    if (argc == 7) {
-        GOAL_CLUSTERS_SIZE = atoi(argv[2]);
-        WEIGHTS[0] = atof(argv[3]);
-        WEIGHTS[1] = atof(argv[4]);
-        WEIGHTS[2] = atof(argv[5]);
-        WEIGHTS[3] = atof(argv[6]);
-
-        if (WEIGHTS[0] < 0 || WEIGHTS[1] < 0 || WEIGHTS[2] < 0 || WEIGHTS[3] < 0) {
-            fprintf(stderr, "Invalid weights (cannot be negative)\n");
-            return 1;
-        }
-    }
-
-    // Open file
-    if (argc < 2) {
-        fprintf(stderr, "No input file\n");
-        return 1;
-    }
-    FILE* DATA = fopen(argv[1], "r");
+// Main input - handles all input.
+// Allocates main clusters array based on input, then writes flow data into clusters.
+int input_all(char* input_filename, int* clusters_size, cluster** clusters) {
+    //open file
+    FILE* DATA = fopen(input_filename, "r");
     if (DATA == NULL) {
         fprintf(stderr, "Failed to open input file\n");
         return 1;
     }
 
-    //INPUT 1 - flow count
+    //input flow count
     int flow_count = 0;
     if (fscanf(DATA, "count=%i", &flow_count) != 1 || flow_count <= 0) {
         fprintf(stderr, "Invalid flow count (%i)\n", flow_count);
@@ -269,48 +243,109 @@ int main(int argc, char* argv[]) { //syntax: ./flows SOUBOR [N WB WT WD WS]
         return 1;
     }
 
-    //INPUT 2 - flows and clusters
-    int clusters_size = 0;
-    cluster* clusters = malloc(flow_count * sizeof(cluster));
-    if (clusters == NULL) {
+    //alloc main clusters array based on flow count
+    *clusters = malloc(flow_count * sizeof(cluster));
+    if (*clusters == NULL) {
         fprintf(stderr, "Failed to malloc %i clusters\n", flow_count);
         fclose(DATA);
         return 1;
     }
 
-    int err_input_flows = input_flows(flow_count, clusters, &clusters_size, DATA);
+    //input flows into clusters in clusters array
+    int err_input_flows = input_flows(flow_count, *clusters, clusters_size, DATA);
     if (err_input_flows) {
-        free_all(clusters, clusters_size);
         fclose(DATA);
         return 1;
     }
 
-    // Close file
+    //close file
     fclose(DATA);
+    return 0;
+}
+
+// Compare flows function for qsort().
+int comp_flows(const void *a, const void *b) {
+    flow* F1 = *(flow**) a;
+    flow* F2 = *(flow**) b;
+    return (F1->flow_id - F2->flow_id);
+}
+// Compare clusters function for qsort().
+int comp_clusters(const void *a, const void *b) {
+    cluster* C1 = (cluster*) a;
+    cluster* C2 = (cluster*) b;
+    return (C1->flows[0]->flow_id - C2->flows[0]->flow_id);
+}
+
+// Main output - prints each cluster and its flows.
+void print_clusters(cluster* clusters, int clusters_size) {
+
+    printf("Clusters:\n");
+    for (int i = 0; i < clusters_size; i++) {
+        cluster cluster = clusters[i];
+
+        printf("cluster %i:", i);
+        for (int j = 0; j < cluster.size; j++) {
+            printf(" %i", cluster.flows[j]->flow_id);
+        }
+        printf("\n");
+    }
+}
 
 
-    //PROCESS CLUSTERS
-    int err_process_clusters = process_clusters(clusters, &clusters_size, GOAL_CLUSTERS_SIZE, WEIGHTS);
+// -- MAIN --
+int main(int argc, char* argv[]) { //syntax: ./flows FILE [N WB WT WD WS]
+    
+    // READ ARGS
+    if (argc < 2) {
+        fprintf(stderr, "No input file\n");
+        return 1;
+    }
+    char* input_filename = argv[1];
+
+    int goal_clusters_size = 0;         // N
+    double weights[4] = {1, 1, 1, 1};   // {WB, WT, WD, WS}
+    if (argc == 7) {
+        goal_clusters_size = atoi(argv[2]);
+        weights[0] = atof(argv[3]); //WB
+        weights[1] = atof(argv[4]); //WT
+        weights[2] = atof(argv[5]); //WD
+        weights[3] = atof(argv[6]); //WS
+
+        if (weights[0] < 0 || weights[1] < 0 || weights[2] < 0 || weights[3] < 0) {
+            fprintf(stderr, "Invalid weights (cannot be negative)\n");
+            return 1;
+        }
+    }
+
+    // INPUT
+    int clusters_size = 0;
+    cluster* clusters = NULL;
+
+    int err_input_all = input_all(input_filename, &clusters_size, &clusters);
+    if (err_input_all) {
+        free_all(clusters, clusters_size);
+        return 1;
+    }
+
+    // PROCESS CLUSTERS
+    int err_process_clusters = process_clusters(clusters, &clusters_size, goal_clusters_size, weights);
     if (err_process_clusters) {
         free_all(clusters, clusters_size);
         return 1;
     };
 
-    //SORT RESULT
-    // Sort flows for every cluster
+    // SORT RESULT
+    //sort flows for every cluster
     for (int i = 0; i < clusters_size; i++) {
         qsort(clusters[i].flows, clusters[i].size, sizeof(flow*), comp_flows);
     }
-    // Sort clusters by first flow
+    //sort clusters by first flow
     qsort(clusters, clusters_size, sizeof(cluster), comp_clusters);
 
-    //OUTPUT
-    printf("Clusters:\n");
-    for (int i = 0; i < clusters_size; i++) {
-        print_cluster(i, &clusters[i]);
-    }
+    // OUTPUT
+    print_clusters(clusters, clusters_size);
     
-    //FREE ALLOCATED
+    // FREE ALLOCATED
     free_all(clusters, clusters_size);
 
     return 0;
