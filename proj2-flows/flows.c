@@ -1,16 +1,16 @@
-
+//
 // ZIT - PROJ 2 - Samuel Bončo
+//
 
-
-// -- LIBS --
+// ==== LIBS ====
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 
-// -- STRUCTS --
+// ==== STRUCTS ====
 typedef struct S_flow {
-    int flow_id;                    //
+    unsigned int flow_id;                    //
     unsigned int total_bytes;       //whole bytes
     unsigned int flow_duration;     //whole seconds
     double avg_interarrival_time;   //non-whole seconds
@@ -23,7 +23,7 @@ typedef struct S_cluster {
 } cluster;
 
 
-// -- FUNCS --
+// ==== FUNCS ====
 // Validates ipv4 - checks each octet for invalid values.
 int validate_ipv4(int* ip) {
     for (int i = 0; i < 4; i++) {
@@ -193,10 +193,10 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
         int ip2[4];
 
         //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
-        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %u %u %i %lf",
+        int data_count = fscanf(DATA, "%u %i.%i.%i.%i %i.%i.%i.%i %u %u %i %lf",
             &new_flow->flow_id,
-            &ip1[0],&ip1[1],&ip1[2],&ip1[3],
-            &ip2[0],&ip2[1],&ip2[2],&ip2[3],
+            &ip1[0], &ip1[1], &ip1[2], &ip1[3],
+            &ip2[0], &ip2[1], &ip2[2], &ip2[3],
             &new_flow->total_bytes,
             &new_flow->flow_duration,
             &packet_count,
@@ -225,8 +225,8 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
     return 0;
 }
 
-// Main input - handles all input.
-// Allocates main clusters array based on input, then writes flow data into clusters.
+// Main input - handles entire input file.
+// Allocates main clusters array based on flow count, then writes flow data into clusters.
 int input_all(char* input_filename, int* clusters_size, cluster** clusters) {
     //open file
     FILE* DATA = fopen(input_filename, "r");
@@ -292,7 +292,7 @@ void print_clusters(cluster* clusters, int clusters_size) {
 }
 
 
-// -- MAIN --
+// ==== MAIN ====
 int main(int argc, char* argv[]) { //syntax: ./flows FILE [N WB WT WD WS]
     
     // READ ARGS
