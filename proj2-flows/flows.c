@@ -10,9 +10,9 @@
 
 // ==== STRUCTS ====
 typedef struct S_flow {
-    unsigned int flow_id;                    //
-    unsigned int total_bytes;       //whole bytes
-    unsigned int flow_duration;     //whole seconds
+    int flow_id;                    //
+    int total_bytes;       //whole bytes
+    int flow_duration;     //whole seconds
     double avg_interarrival_time;   //non-whole seconds
     double avg_packet_len;          //non-whole bytes
 } flow;
@@ -23,11 +23,18 @@ typedef struct S_cluster {
 } cluster;
 
 
+// ==== DEFINES ====
+#define IPV4_OCTET_MAX 255 
+#define IPV4_OCTET_MIN 0 
+#define IPV4_OCTET_COUNT 4 
+#define EXPECTED_FLOW_DATA_COUNT 13
+
+
 // ==== FUNCS ====
 // Validates ipv4 - checks each octet for invalid values.
-int validate_ipv4(int* ip) {
-    for (int i = 0; i < 4; i++) {
-        if (ip[i] < 0 || ip[i] > 255) {
+int is_valid_ipv4(int* ip) {
+    for (int i = 0; i < IPV4_OCTET_COUNT; i++) {
+        if (ip[i] < IPV4_OCTET_MIN || ip[i] > IPV4_OCTET_MAX) {
             return 0;
         } 
     }
@@ -179,7 +186,8 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
         }
         *clusters_size += 1;
 
-        flow* new_flow = malloc(sizeof(flow));      // current flow reference for easier work
+        // Alloc current_flow and write it into cluster
+        flow* new_flow = malloc(sizeof(flow));
         if (new_flow == NULL) {
             fprintf(stderr, "Failed to malloc flow object i:%i\n", i);
             return 1;
@@ -189,11 +197,11 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
         // Read flow data
         // (read ips only to check validity)
         int packet_count;
-        int ip1[4];
-        int ip2[4];
+        int ip1[IPV4_OCTET_COUNT];
+        int ip2[IPV4_OCTET_COUNT];
 
         //[FLOWID SRC_IP DST_IP TOTAL_BYTES FLOW_DURATION PACKET_COUNT AVG_INTERARRIVAL]
-        int data_count = fscanf(DATA, "%u %i.%i.%i.%i %i.%i.%i.%i %u %u %i %lf",
+        int data_count = fscanf(DATA, "%i %i.%i.%i.%i %i.%i.%i.%i %i %i %i %lf",
             &new_flow->flow_id,
             &ip1[0], &ip1[1], &ip1[2], &ip1[3],
             &ip2[0], &ip2[1], &ip2[2], &ip2[3],
@@ -202,20 +210,28 @@ int input_flows(int flow_count, cluster* clusters, int* clusters_size, FILE* DAT
             &packet_count,
             &new_flow->avg_interarrival_time
         );
-        if (data_count != 13) {
-            fprintf(stderr, "Missing data values (data_count:%i)\n", data_count);
+
+        // Check for missing data
+        if (data_count != EXPECTED_FLOW_DATA_COUNT) {
+            fprintf(stderr, "Missing flow data, expected %i values, got %i\n", EXPECTED_FLOW_DATA_COUNT, data_count);
+            return 1;
+        }
+
+        // Check for valid data
+        if (new_flow->flow_id < 0 || new_flow->total_bytes < 0 || new_flow->flow_duration < 0 || new_flow->avg_interarrival_time < 0) {
+            fprintf(stderr, "Invalid flow data in flow id:'%i'\n", new_flow->flow_id);
             return 1;
         }
 
         // Validate ips
-        if (!validate_ipv4(ip1) || !validate_ipv4(ip2)) {
+        if (!is_valid_ipv4(ip1) || !is_valid_ipv4(ip2)) {
             fprintf(stderr, "Invalid IP in flow id:%i\n", new_flow->flow_id);
             return 1;
         };
 
         // Calculate average packet length for flow
         if (packet_count <= 0) {
-            fprintf(stderr, "Invalid data in flow id:%i (packet_count <= 0)\n", new_flow->flow_id);
+            fprintf(stderr, "Invalid packet_count in flow id:%i (%i <= 0)\n", new_flow->flow_id, packet_count);
             return 1;
         }
         new_flow->avg_packet_len = (double) new_flow->total_bytes / packet_count;
